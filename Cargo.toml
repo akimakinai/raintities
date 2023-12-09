@@ -1,0 +1,25 @@
+[package]
+name = "alot"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bevy = "0.12.1"
+bevy-debug-text-overlay = "7.0.0"
+bevy-inspector-egui = "0.21.0"
+bevy_framepace = "0.14.1"
+bevy_xpbd_2d = "0.3.2"
+leafwing-input-manager = "0.11.2"
+rand = "0.8.5"
+
+# https://github.com/bevyengine/bevy/issues/10425
+blake3 = { version = "1.5", features = ["pure"] }
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+debug = 1
+opt-level = 3
