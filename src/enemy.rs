@@ -1,4 +1,7 @@
-use bevy::{prelude::*, audio::{Volume, VolumeLevel}};
+use bevy::{
+    audio::{Volume, VolumeLevel},
+    prelude::*,
+};
 use bevy_debug_text_overlay::screen_print;
 use bevy_xpbd_2d::prelude::*;
 
@@ -16,25 +19,13 @@ pub const ENEMY_WIDTH: f32 = 80.0;
 #[derive(Component, Debug)]
 pub struct EnemyController {
     state: EnemyState,
-    attack_num: u32,
-    cur_attack_num: u32,
-    level_y: Option<f32>,
+    attack_pos: Vec<Vec2>,
 }
 
-impl Default for EnemyController {
-    fn default() -> Self {
-        Self {
-            state: EnemyState::Moving,
-            attack_num: 2,
-            cur_attack_num: 0,
-            level_y: None,
-        }
-    }
-}
-
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Default)]
 pub enum EnemyState {
     Attacking,
+    #[default]
     Moving,
 }
 
@@ -47,6 +38,18 @@ pub struct EnemyBundle {
 }
 
 pub fn spawn_enemy(commands: &mut Commands, pos: Vec2) {
+    const ATTACK_NUM: u32 = 3;
+
+    let mut attack_pos = vec![
+        Vec2::new(SCREEN_WIDTH / ATTACK_NUM as f32 - SCREEN_WIDTH / 2., pos.y),
+        Vec2::new(
+            2. * SCREEN_WIDTH / ATTACK_NUM as f32 - SCREEN_WIDTH / 2.,
+            pos.y,
+        ),
+        Vec2::new(SCREEN_WIDTH / 2. + ENEMY_WIDTH / 2., pos.y),
+    ];
+    attack_pos.reverse();
+
     commands
         .spawn(EnemyBundle {
             sprite: SpriteBundle {
@@ -58,7 +61,10 @@ pub fn spawn_enemy(commands: &mut Commands, pos: Vec2) {
                 ..default()
             },
             enemy: Enemy,
-            controller: default(),
+            controller: EnemyController {
+                state: EnemyState::Moving,
+                attack_pos,
+            },
         })
         .insert((Collider::ball(ENEMY_WIDTH / 2.0), RigidBody::Kinematic));
 }
@@ -101,13 +107,11 @@ impl EnemyBundle {
 
 fn enemy_state_behavior(
     mut commands: Commands,
-    mut enemies: Query<(Entity, &Transform, &mut EnemyController), Changed<EnemyController>>,
+    mut enemies: Query<(Entity, &EnemyController), Changed<EnemyController>>,
 ) {
-    for (entity, transform, mut ctrl) in &mut enemies {
+    for (entity, ctrl) in &mut enemies {
         screen_print!("Enemy({:?}) ctrl: {:?}", entity, ctrl);
-        if ctrl.level_y.is_none() {
-            ctrl.level_y = Some(transform.translation.y);
-        }
+
         match ctrl.state {
             EnemyState::Attacking => {
                 commands.entity(entity).insert(LineUpBullets::default());
@@ -129,23 +133,30 @@ fn enemy_movement(
             continue;
         }
 
-        let mut movement_target = (ctrl.cur_attack_num + 1) as f32 * (SCREEN_WIDTH)
-            / (ctrl.attack_num + 1) as f32
-            - SCREEN_WIDTH / 2.0;
-        if ctrl.cur_attack_num == ctrl.attack_num {
-            movement_target += ENEMY_WIDTH / 2.0;
-        }
+        let Some(move_target) = ctrl.attack_pos.last() else {
+            commands.entity(id).despawn();
+            continue;
+        };
 
-        screen_print!("movement_target: {}", movement_target);
+        screen_print!("movement_target: {}", move_target);
 
-        if transform.translation.x < movement_target {
-            transform.translation.x += 200.0 * time.delta_seconds();
-        } else {
-            if ctrl.cur_attack_num >= ctrl.attack_num {
+        let diff = *move_target - transform.translation.xy();
+        let movement = diff.normalize() * 100.0 * time.delta_seconds();
+        screen_print!("diff = {}, movement = {}", diff, movement);
+
+        // If the enemy is close to the target, just move it to the target.
+        if diff.length() < 0.1 || (*move_target - transform.translation.xy()).length() <= movement.length() {
+            transform.translation = move_target.extend(transform.translation.z);
+
+            ctrl.attack_pos.pop();
+            if ctrl.attack_pos.len() == 0 {
                 commands.entity(id).despawn();
             } else {
                 ctrl.state = EnemyState::Attacking;
             }
+        } else {
+            // Otherwise, move it to the direction of the target.
+            transform.translation += movement.extend(0.0);
         }
     }
 }
@@ -155,7 +166,6 @@ fn enemy_attack_done(
 ) {
     for (mut ctrl, bullets) in &mut enemies {
         if ctrl.state == EnemyState::Attacking && bullets.done {
-            ctrl.cur_attack_num += 1;
             ctrl.state = EnemyState::Moving;
         }
     }
