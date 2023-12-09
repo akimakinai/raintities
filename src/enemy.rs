@@ -1,11 +1,11 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, audio::{Volume, VolumeLevel}};
 use bevy_debug_text_overlay::screen_print;
 use bevy_xpbd_2d::prelude::*;
 
 use crate::SCREEN_WIDTH;
 
-fn startup(world: &mut World) {
-    world.init_resource::<EnemyResource>();
+fn startup(mut commands: Commands) {
+    commands.init_resource::<EnemyResource>();
 }
 
 #[derive(Component, Default)]
@@ -66,6 +66,7 @@ pub fn spawn_enemy(commands: &mut Commands, pos: Vec2) {
 #[derive(Resource)]
 struct EnemyResource {
     image: Handle<Image>,
+    bullet_sound: Handle<AudioSource>,
 }
 
 impl FromWorld for EnemyResource {
@@ -75,7 +76,15 @@ impl FromWorld for EnemyResource {
             .unwrap()
             .load::<Image>("sprites/snow.png");
 
-        Self { image }
+        let bullet_sound = world
+            .get_resource::<AssetServer>()
+            .unwrap()
+            .load("sounds/ice.wav");
+
+        Self {
+            image,
+            bullet_sound,
+        }
     }
 }
 
@@ -225,6 +234,7 @@ fn line_up_bullets_system(
     mut commands: Commands,
     mut q: Query<(&mut LineUpBullets, &Transform)>,
     time: Res<Time>,
+    enemy_res: Res<EnemyResource>,
 ) {
     for (mut line_up_bullets, transform) in &mut q {
         if line_up_bullets.next_timer.tick(time.delta()).finished() {
@@ -244,6 +254,14 @@ fn line_up_bullets_system(
             let id = commands
                 .spawn(StillBullet)
                 .insert(Transform::from_translation(transform.translation + delta))
+                .insert(AudioBundle {
+                    source: enemy_res.bullet_sound.clone(),
+                    settings: PlaybackSettings {
+                        mode: bevy::audio::PlaybackMode::Once,
+                        volume: Volume::Relative(VolumeLevel::new(0.2)),
+                        ..default()
+                    },
+                })
                 .id();
             line_up_bullets.bullets.push((id, delta));
             line_up_bullets.angle += 2.0 * std::f32::consts::PI / line_up_bullets.num as f32;

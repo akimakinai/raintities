@@ -26,12 +26,14 @@ impl Plugin for PlayerPlugin {
 struct PlayerResource {
     bullet_mesh: Handle<Mesh>,
     bullet_material: Handle<ColorMaterial>,
+    attack_sound: Handle<AudioSource>,
 }
 
 fn startup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut color_materials: ResMut<Assets<ColorMaterial>>,
+    asset_server: Res<AssetServer>,
 ) {
     commands.insert_resource(PlayerResource {
         bullet_mesh: meshes.add(
@@ -42,6 +44,7 @@ fn startup(
             .into(),
         ),
         bullet_material: color_materials.add(ColorMaterial::from(Color::CYAN)),
+        attack_sound: asset_server.load("sounds/splash_03.ogg"),
     });
 }
 
@@ -127,13 +130,21 @@ struct Bullet;
 fn attack_system(
     mut commands: Commands,
     mut q: Query<
-        (&ActionState<Action>, &Transform, &mut Player),
+        (Entity, &ActionState<Action>, &Transform, &mut Player),
         (With<Player>, Changed<ActionState<Action>>),
     >,
     res: Res<PlayerResource>,
 ) {
-    for (state, transform, mut player) in &mut q {
+    for (id, state, transform, mut player) in &mut q {
         if state.just_pressed(Action::Attack) {
+            commands.entity(id).insert(AudioBundle {
+                source: res.attack_sound.clone(),
+                settings: PlaybackSettings {
+                    mode: bevy::audio::PlaybackMode::Remove,
+                    ..default()
+                }
+            });
+
             let bullet_bundle = ColorMesh2dBundle {
                 mesh: Mesh2dHandle(res.bullet_mesh.clone()),
                 material: res.bullet_material.clone(),

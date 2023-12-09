@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = "0.12.1"
+bevy = { version = "0.12.1", features = ["wav"] }
 bevy-debug-text-overlay = "7.0.0"
 bevy-inspector-egui = "0.21.0"
 bevy_framepace = "0.14.1"
