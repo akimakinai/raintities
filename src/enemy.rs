@@ -5,7 +5,7 @@ use bevy::{
 use bevy_debug_text_overlay::screen_print;
 use bevy_xpbd_2d::prelude::*;
 
-use crate::SCREEN_WIDTH;
+use crate::{SCREEN_WIDTH, Layer, health::Health};
 
 fn startup(mut commands: Commands) {
     commands.init_resource::<EnemyResource>();
@@ -14,7 +14,7 @@ fn startup(mut commands: Commands) {
 #[derive(Component, Default)]
 pub struct Enemy;
 
-pub const ENEMY_WIDTH: f32 = 80.0;
+pub const ENEMY_SIZE: f32 = 80.0;
 
 #[derive(Component, Debug)]
 pub struct EnemyController {
@@ -34,6 +34,7 @@ pub struct EnemyBundle {
     pub enemy: Enemy,
     pub controller: EnemyController,
     pub sprite: SpriteBundle,
+    pub health: Health,
     // pub line_up_bullets: LineUpBullets,
 }
 
@@ -46,7 +47,7 @@ pub fn spawn_enemy(commands: &mut Commands, pos: Vec2) {
             2. * SCREEN_WIDTH / ATTACK_NUM as f32 - SCREEN_WIDTH / 2.,
             pos.y,
         ),
-        Vec2::new(SCREEN_WIDTH / 2. + ENEMY_WIDTH / 2., pos.y),
+        Vec2::new(SCREEN_WIDTH / 2. + ENEMY_SIZE / 2., pos.y),
     ];
     attack_pos.reverse();
 
@@ -55,7 +56,7 @@ pub fn spawn_enemy(commands: &mut Commands, pos: Vec2) {
             sprite: SpriteBundle {
                 transform: Transform::from_translation(pos.extend(0.0)),
                 sprite: Sprite {
-                    custom_size: Some(Vec2::new(ENEMY_WIDTH, ENEMY_WIDTH)),
+                    custom_size: Some(Vec2::new(ENEMY_SIZE, ENEMY_SIZE)),
                     ..default()
                 },
                 ..default()
@@ -65,8 +66,9 @@ pub fn spawn_enemy(commands: &mut Commands, pos: Vec2) {
                 state: EnemyState::Moving,
                 attack_pos,
             },
+            health: Health { health: 80., max_health: 100. },
         })
-        .insert((Collider::ball(ENEMY_WIDTH / 2.0), RigidBody::Kinematic));
+        .insert((Collider::ball(ENEMY_SIZE / 2.0), RigidBody::Kinematic));
 }
 
 #[derive(Resource)]
@@ -134,7 +136,7 @@ fn enemy_movement(
         }
 
         let Some(move_target) = ctrl.attack_pos.last() else {
-            commands.entity(id).despawn();
+            commands.entity(id).despawn_recursive();
             continue;
         };
 
@@ -150,7 +152,7 @@ fn enemy_movement(
 
             ctrl.attack_pos.pop();
             if ctrl.attack_pos.len() == 0 {
-                commands.entity(id).despawn();
+                commands.entity(id).despawn_recursive();
             } else {
                 ctrl.state = EnemyState::Attacking;
             }
@@ -173,22 +175,6 @@ fn enemy_attack_done(
 
 #[derive(Component)]
 struct Bullet;
-
-// fn spawn_enemy_bullet(
-//     mut commands: Commands,
-//     enemies: Query<&Transform, Added<Enemy>>,
-//     assets: Res<AssetServer>,
-// ) {
-//     for transform in &enemies {
-//         commands
-//             .spawn(SpriteBundle {
-//                 transform: transform.with_scale(Vec3::splat(0.1)),
-//                 texture: assets.load("sprites/typhoon_white.png"),
-//                 ..default()
-//             })
-//             .insert(Bullet);
-//     }
-// }
 
 fn rotate_bullets(time: Res<Time>, mut bullets: Query<&mut Transform, With<Bullet>>) {
     for mut transform in &mut bullets {
@@ -217,6 +203,8 @@ impl Default for LineUpBullets {
     }
 }
 
+const BULLET_SIZE: f32 = 64.0;
+
 #[derive(Component)]
 struct StillBullet;
 
@@ -229,11 +217,16 @@ fn spawn_still_bullet(
         commands
             .entity(entity)
             .insert(SpriteBundle {
-                texture: assets.load("sprites/typhoon_white.png"),
-                transform: transform.with_scale(Vec3::splat(0.05)),
+                texture: assets.load("sprites/spiral.png"),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(BULLET_SIZE, BULLET_SIZE)),
+                    ..default()
+                },
+                transform: *transform,
                 ..default()
             })
-            .insert(Bullet);
+            .insert(Bullet)
+            .insert((Collider::ball(BULLET_SIZE / 2. * 0.6), RigidBody::Kinematic, CollisionLayers::new([Layer::Bullet], [])));
     }
 }
 
@@ -260,7 +253,7 @@ fn line_up_bullets_system(
             }
 
             let angle = line_up_bullets.angle;
-            let delta = Vec3::new(-angle.sin(), angle.cos(), 0.0) * 100.0;
+            let delta = Vec3::new(-angle.sin(), angle.cos(), 0.0) * ENEMY_SIZE / 2.;
             let id = commands
                 .spawn(StillBullet)
                 .insert(Transform::from_translation(transform.translation + delta))

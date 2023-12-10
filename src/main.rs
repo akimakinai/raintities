@@ -1,4 +1,5 @@
 mod enemy;
+mod health;
 mod player;
 
 use bevy::{
@@ -9,11 +10,19 @@ use bevy::{
 use bevy_debug_text_overlay::{screen_print, OverlayPlugin};
 use bevy_framepace::FramepacePlugin;
 use bevy_xpbd_2d::prelude::*;
-use enemy::{EnemyPlugin, ENEMY_WIDTH, spawn_enemy};
+use enemy::{spawn_enemy, EnemyPlugin, ENEMY_SIZE};
+use health::HealthBarPlugin;
 use player::{Player, PlayerPlugin};
 
 pub const SCREEN_WIDTH: f32 = 800.0;
 pub const SCREEN_HEIGHT: f32 = 600.0;
+
+#[derive(PhysicsLayer)]
+pub enum Layer {
+    Player,
+    Bullet,
+    Enemy,
+}
 
 fn main() {
     let mut app = App::new();
@@ -41,6 +50,7 @@ fn main() {
 
     app.add_plugins(PlayerPlugin)
         .add_plugins(EnemyPlugin)
+        .add_plugins(HealthBarPlugin)
         .add_systems(Startup, setup)
         .add_systems(PreUpdate, update_mouse_pos)
         .add_systems(
@@ -60,13 +70,26 @@ fn main() {
         .run();
 }
 
-fn setup(mut commands: Commands) {
+#[derive(Component)]
+struct MainCamera;
+
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     // Add camera
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn((Camera2dBundle::default(), MainCamera));
+
+    commands.spawn(SpriteBundle {
+        texture: asset_server.load("background/clouds.png"),
+        sprite: Sprite {
+            color: Color::rgb(0.5, 0.5, 0.5),
+            ..default()
+        },
+        transform: Transform::from_translation(Vec3::Z * -1.0),
+        ..default()
+    });
 
     spawn_enemy(
         &mut commands,
-        Vec2::new(-SCREEN_WIDTH / 2.0 - ENEMY_WIDTH, 0.0),
+        Vec2::new(-SCREEN_WIDTH / 2.0 - ENEMY_SIZE, 0.0),
     );
 
     commands.spawn((Player::default(), Transform::from_translation(Vec3::Z)));

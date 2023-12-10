@@ -3,12 +3,7 @@ use bevy_xpbd_2d::prelude::*;
 use leafwing_input_manager::prelude::*;
 use rand::Rng;
 
-#[derive(PhysicsLayer)]
-enum Layer {
-    Player,
-    Bullet,
-    Enemy,
-}
+use crate::{Layer, MainCamera};
 
 pub struct PlayerPlugin;
 
@@ -142,7 +137,7 @@ fn attack_system(
                 settings: PlaybackSettings {
                     mode: bevy::audio::PlaybackMode::Remove,
                     ..default()
-                }
+                },
             });
 
             let bullet_bundle = ColorMesh2dBundle {
@@ -176,9 +171,14 @@ fn attack_system(
     }
 }
 
-fn remove_bullets(mut commands: Commands, bullets: Query<(Entity, &Transform), With<Bullet>>) {
+fn remove_bullets(
+    mut commands: Commands,
+    bullets: Query<(Entity, &Transform), With<Bullet>>,
+    camera: Query<&Transform, With<MainCamera>>,
+) {
+    let camera = camera.single();
     for (entity, transform) in &bullets {
-        if transform.translation.length() > 1000.0 {
+        if (transform.translation - camera.translation).length() > 1000.0 {
             commands.entity(entity).despawn();
         }
     }
