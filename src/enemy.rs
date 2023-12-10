@@ -85,7 +85,7 @@ impl FromWorld for EnemyResource {
         let bullet_sound = world
             .get_resource::<AssetServer>()
             .unwrap()
-            .load("sounds/ice.wav");
+            .load("sounds/ice.ogg");
 
         Self {
             image,
