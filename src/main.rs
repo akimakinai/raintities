@@ -1,3 +1,4 @@
+mod background;
 mod boss;
 mod damage;
 mod enemy;
@@ -7,9 +8,11 @@ mod level;
 mod player;
 mod title;
 
+use background::{Background2dBundle, BackgroundMaterial, BackgroundPlugin};
 use bevy::{
     diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin},
     prelude::*,
+    sprite::Mesh2dHandle,
     window::{PrimaryWindow, WindowResolution},
 };
 use bevy_debug_text_overlay::{screen_print, OverlayPlugin};
@@ -49,19 +52,26 @@ enum GameState {
 fn main() {
     let mut app = App::new();
 
-    app.add_plugins(DefaultPlugins.set(WindowPlugin {
-        primary_window: Some(Window {
-            resolution: WindowResolution::new(SCREEN_WIDTH, SCREEN_HEIGHT),
-            resizable: false,
-            ..default()
-        }),
-        ..default()
-    }));
-    app.insert_resource(ClearColor(Color::rgb(
-        150. / 255. / 2.,
-        180. / 255. / 2.,
-        218. / 255. / 2.,
-    )));
+    app.add_plugins(
+        DefaultPlugins
+            .set(WindowPlugin {
+                primary_window: Some(Window {
+                    resolution: WindowResolution::new(SCREEN_WIDTH, SCREEN_HEIGHT),
+                    resizable: false,
+                    ..default()
+                }),
+                ..default()
+            })
+            .set(AssetPlugin {
+                watch_for_changes_override: Some(true),
+                ..Default::default()
+            }),
+    );
+    // app.insert_resource(ClearColor(Color::rgb(
+    //     150. / 255. / 2.,
+    //     180. / 255. / 2.,
+    //     218. / 255. / 2.,
+    // )));
 
     app.add_plugins(FrameTimeDiagnosticsPlugin::default())
         .add_systems(Update, |diagnostics: Res<DiagnosticsStore>| {
@@ -86,7 +96,9 @@ fn main() {
         .add_plugins(LevelPlugin)
         .add_plugins(BossPlugin)
         .add_plugins(TitlePlugin)
+        .add_plugins(BackgroundPlugin)
         .add_systems(Startup, setup)
+        .add_systems(PostUpdate, scroll_background)
         .add_systems(PreUpdate, update_mouse_pos)
         .add_systems(
             Update,
@@ -197,22 +209,38 @@ fn setup_level(mut commands: Commands) {
 #[derive(Component)]
 struct MainCamera;
 
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn setup(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut bg_materials: ResMut<Assets<BackgroundMaterial>>,
+) {
     // Add camera
     commands
         .spawn((Camera2dBundle::default(), MainCamera))
         .with_children(|c| {
-            c.spawn(SpriteBundle {
-                texture: asset_server.load("background/clouds.png"),
-                sprite: Sprite {
-                    color: Color::rgb(0.5, 0.5, 0.5),
-                    ..default()
-                },
-                transform: Transform::from_translation(Vec3::Z * -1.0),
+            c.spawn(Background2dBundle {
+                mesh: Mesh2dHandle(
+                    meshes.add(shape::Quad::new(Vec2::new(SCREEN_WIDTH, SCREEN_HEIGHT)).into()),
+                ),
+                material: bg_materials.add(BackgroundMaterial { scroll: 0. }),
+                transform: Transform::from_translation(-Vec3::Z),
                 ..default()
             });
         })
         .insert(Name::new("Background"));
+}
+
+fn scroll_background(
+    camera: Query<&Transform, With<MainCamera>>,
+    background: Query<&Handle<BackgroundMaterial>>,
+    mut bg_materials: ResMut<Assets<BackgroundMaterial>>,
+) {
+    let camera_y = camera.single().translation.y;
+
+    for handle in &background {
+        let material = bg_materials.get_mut(handle).unwrap();
+        material.scroll = camera_y;
+    }
 }
 
 #[derive(Resource, Default, PartialEq)]
