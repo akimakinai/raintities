@@ -1,21 +1,12 @@
+mod damage_effect;
+
 use bevy::{prelude::*, sprite::Mesh2dHandle};
+use bevy_debug_text_overlay::screen_print;
 use bevy_xpbd_2d::prelude::*;
 use leafwing_input_manager::prelude::*;
 use rand::Rng;
 
-use crate::{Layer, MainCamera};
-
-pub struct PlayerPlugin;
-
-impl Plugin for PlayerPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_plugins(InputManagerPlugin::<Action>::default());
-        app.add_systems(Startup, startup);
-        app.add_systems(PostUpdate, (player_spawn, update_player_radius));
-        app.add_systems(Update, (attack_system, remove_bullets));
-        app.insert_resource(Gravity(Vec2::NEG_Y * 300.0));
-    }
-}
+use crate::{item::Item, MainCamera, MyLayer};
 
 #[derive(Resource)]
 struct PlayerResource {
@@ -54,6 +45,13 @@ impl Default for Player {
     }
 }
 
+impl Player {
+    /// Changes the player's radius by the given amount in terms of area.
+    pub fn increase(&mut self, by: f32) {
+        self.radius = (self.radius.powi(2) + by).clamp(0., 1600.).sqrt();
+    }
+}
+
 #[derive(Actionlike, Reflect, Clone, Hash, PartialEq, Eq, Debug)]
 enum Action {
     Attack,
@@ -74,7 +72,7 @@ fn player_spawn(
                     meshes.add(
                         shape::Circle {
                             radius: player.radius,
-                            vertices: 8,
+                            vertices: 32,
                         }
                         .into(),
                     ),
@@ -92,7 +90,10 @@ fn player_spawn(
             })
             .insert((
                 RigidBody::Kinematic,
-                CollisionLayers::new([Layer::Player], [Layer::Enemy]),
+                CollisionLayers::new(
+                    [MyLayer::Player],
+                    [MyLayer::Enemy, MyLayer::EnemyBullet, MyLayer::Item],
+                ),
                 // Collider is added in update_player_radius
             ));
     }
@@ -110,7 +111,7 @@ fn update_player_radius(
                 meshes.add(
                     shape::Circle {
                         radius: player.radius,
-                        vertices: 8,
+                        vertices: 32,
                     }
                     .into(),
                 ),
@@ -120,7 +121,7 @@ fn update_player_radius(
 }
 
 #[derive(Component)]
-struct Bullet;
+pub struct PlayerBullet;
 
 fn attack_system(
     mut commands: Commands,
@@ -146,25 +147,30 @@ fn attack_system(
                 ..default()
             };
 
-            player.radius *= 0.9;
+            let num = (player.radius / 50. * 32.) as usize;
+
+            player.increase(-100.);
+            screen_print!("Player radius: {}", player.radius);
 
             let mut rng = rand::thread_rng();
-            for _ in 0..32 {
-                let dev = Vec2::new(rng.gen::<f32>() - 0.5, rng.gen::<f32>() - 0.5) * 100.0;
+            for _ in 0..num {
+                let r = rng.gen::<f32>() * 50.0;
+                let theta = rng.gen::<f32>() * std::f32::consts::PI * 2.0;
+                let pos = Vec2::new(theta.cos(), theta.sin()) * r;
 
                 commands
                     .spawn(ColorMesh2dBundle {
                         transform: Transform::from_translation(
-                            transform.translation + dev.extend(0.0),
+                            transform.translation + pos.extend(0.0),
                         ),
                         ..bullet_bundle.clone()
                     })
                     .insert((
-                        Bullet,
+                        PlayerBullet,
                         RigidBody::Dynamic,
                         Collider::ball(8.0),
-                        CollisionLayers::new([Layer::Bullet], [Layer::Enemy]),
-                        LinearVelocity(dev * 2.0),
+                        CollisionLayers::new([MyLayer::PlayerBullet], [MyLayer::Enemy]),
+                        LinearVelocity(pos * 2.0),
                     ));
             }
         }
@@ -173,13 +179,45 @@ fn attack_system(
 
 fn remove_bullets(
     mut commands: Commands,
-    bullets: Query<(Entity, &Transform), With<Bullet>>,
+    bullets: Query<(Entity, &Transform), With<PlayerBullet>>,
     camera: Query<&Transform, With<MainCamera>>,
 ) {
     let camera = camera.single();
     for (entity, transform) in &bullets {
         if (transform.translation - camera.translation).length() > 1000.0 {
-            commands.entity(entity).despawn();
+            commands.entity(entity).despawn_recursive();
         }
+    }
+}
+
+// system to handle player getting an item
+fn player_item_system(
+    mut commands: Commands,
+    mut player: Query<(&mut Player, &CollidingEntities)>,
+    items: Query<&Item>,
+) {
+    let Ok((mut player, collisions)) = player.get_single_mut() else {
+        return;
+    };
+    for &collision in collisions.iter() {
+        if items.contains(collision) {
+            player.increase(10.);
+            commands.entity(collision).despawn_recursive();
+        }
+    }
+}
+
+pub struct PlayerPlugin;
+
+impl Plugin for PlayerPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins(damage_effect::DamageEffectPlugin);
+
+        app.add_plugins(InputManagerPlugin::<Action>::default());
+        app.add_systems(Startup, startup);
+        app.add_systems(PostUpdate, (player_spawn, update_player_radius));
+        app.add_systems(Update, (attack_system, remove_bullets));
+        app.add_systems(Update, player_item_system);
+        app.insert_resource(Gravity(Vec2::NEG_Y * 300.0));
     }
 }

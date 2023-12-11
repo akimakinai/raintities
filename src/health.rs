@@ -63,24 +63,21 @@ fn add_healthbar(
 }
 
 fn update_healthbar(
-    mut healths: Query<
-        (&Health, &Children, &mut Visibility),
-        (Changed<Health>, Without<HealthBar>),
-    >,
-    health_bars: Query<&Children, (With<HealthBar>, Without<Health>)>,
+    healths: Query<(&Health, &Children), (Changed<Health>, Without<HealthBar>)>,
+    mut health_bars: Query<(&Children, &mut Visibility), (With<HealthBar>, Without<Health>)>,
     mut transforms: Query<&mut Transform>,
 ) {
-    for (health, children, mut vis) in &mut healths {
+    for (health, children) in &healths {
         screen_print!("Health: {:?} (children = {})", health, children.len());
 
-        if health.percent() >= 100.0 {
-            vis.set_if_neq(Visibility::Hidden);
-        } else {
-            vis.set_if_neq(Visibility::Inherited);
-        }
-
         for child in children {
-            if let Ok(bar_children) = health_bars.get(*child) {
+            if let Ok((bar_children, mut vis)) = health_bars.get_mut(*child) {
+                if health.percent() >= 100.0 {
+                    vis.set_if_neq(Visibility::Hidden);
+                } else {
+                    vis.set_if_neq(Visibility::Inherited);
+                }
+
                 screen_print!("bar_children = {:?}", bar_children);
                 let foreground = bar_children[0];
                 let mut tf = transforms.get_mut(foreground).unwrap();

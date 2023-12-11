@@ -5,7 +5,7 @@ use bevy::{
 use bevy_debug_text_overlay::screen_print;
 use bevy_xpbd_2d::prelude::*;
 
-use crate::{SCREEN_WIDTH, Layer, health::Health};
+use crate::{health::Health, MyLayer, SCREEN_WIDTH};
 
 fn startup(mut commands: Commands) {
     commands.init_resource::<EnemyResource>();
@@ -16,13 +16,22 @@ pub struct Enemy;
 
 pub const ENEMY_SIZE: f32 = 80.0;
 
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Clone)]
 pub struct EnemyController {
     state: EnemyState,
-    attack_pos: Vec<Vec2>,
+    pub attack_pos: Vec<Vec2>,
 }
 
-#[derive(PartialEq, Debug, Default)]
+impl From<Vec<Vec2>> for EnemyController {
+    fn from(value: Vec<Vec2>) -> Self {
+        Self {
+            attack_pos: value,
+            state: EnemyState::default(),
+        }
+    }
+}
+
+#[derive(PartialEq, Debug, Default, Clone)]
 pub enum EnemyState {
     Attacking,
     #[default]
@@ -38,7 +47,7 @@ pub struct EnemyBundle {
     // pub line_up_bullets: LineUpBullets,
 }
 
-pub fn spawn_enemy(commands: &mut Commands, pos: Vec2) {
+pub fn spawn_enemy(commands: &mut Commands, pos: Vec2, controller: EnemyController) {
     const ATTACK_NUM: u32 = 3;
 
     let mut attack_pos = vec![
@@ -62,13 +71,17 @@ pub fn spawn_enemy(commands: &mut Commands, pos: Vec2) {
                 ..default()
             },
             enemy: Enemy,
-            controller: EnemyController {
-                state: EnemyState::Moving,
-                attack_pos,
+            controller,
+            health: Health {
+                health: 100.,
+                max_health: 100.,
             },
-            health: Health { health: 80., max_health: 100. },
         })
-        .insert((Collider::ball(ENEMY_SIZE / 2.0), RigidBody::Kinematic));
+        .insert((
+            Collider::ball(ENEMY_SIZE / 2.0),
+            RigidBody::Kinematic,
+            CollisionLayers::new([MyLayer::Enemy], [MyLayer::Player, MyLayer::PlayerBullet]),
+        ));
 }
 
 #[derive(Resource)]
@@ -140,14 +153,16 @@ fn enemy_movement(
             continue;
         };
 
-        screen_print!("movement_target: {}", move_target);
+        // screen_print!("movement_target: {}", move_target);
 
         let diff = *move_target - transform.translation.xy();
         let movement = diff.normalize() * 100.0 * time.delta_seconds();
-        screen_print!("diff = {}, movement = {}", diff, movement);
+        // screen_print!("diff = {}, movement = {}", diff, movement);
 
         // If the enemy is close to the target, just move it to the target.
-        if diff.length() < 0.1 || (*move_target - transform.translation.xy()).length() <= movement.length() {
+        if diff.length() < 0.1
+            || (*move_target - transform.translation.xy()).length() <= movement.length()
+        {
             transform.translation = move_target.extend(transform.translation.z);
 
             ctrl.attack_pos.pop();
@@ -174,9 +189,9 @@ fn enemy_attack_done(
 }
 
 #[derive(Component)]
-struct Bullet;
+pub struct EnemyBullet;
 
-fn rotate_bullets(time: Res<Time>, mut bullets: Query<&mut Transform, With<Bullet>>) {
+fn rotate_bullets(time: Res<Time>, mut bullets: Query<&mut Transform, With<EnemyBullet>>) {
     for mut transform in &mut bullets {
         transform.rotate(Quat::from_rotation_z(time.delta_seconds() * 2.0));
     }
@@ -225,8 +240,12 @@ fn spawn_still_bullet(
                 transform: *transform,
                 ..default()
             })
-            .insert(Bullet)
-            .insert((Collider::ball(BULLET_SIZE / 2. * 0.6), RigidBody::Kinematic, CollisionLayers::new([Layer::Bullet], [])));
+            .insert(EnemyBullet)
+            .insert((
+                Collider::ball(BULLET_SIZE / 2. * 0.6),
+                RigidBody::Kinematic,
+                CollisionLayers::new([MyLayer::EnemyBullet], [MyLayer::Player]),
+            ));
     }
 }
 
@@ -242,11 +261,12 @@ fn line_up_bullets_system(
     for (mut line_up_bullets, transform) in &mut q {
         if line_up_bullets.next_timer.tick(time.delta()).finished() {
             if line_up_bullets.bullets.len() >= line_up_bullets.num as usize {
-                for (entity, delta) in &line_up_bullets.bullets {
-                    commands
-                        .entity(*entity)
-                        .remove::<StillBullet>()
-                        .insert(StraightBullet(delta.clone()));
+                for &(entity, delta) in &line_up_bullets.bullets {
+                    commands.add(move |world: &mut World| {
+                        if let Some(mut e) = world.get_entity_mut(entity) {
+                            e.remove::<StillBullet>().insert(StraightBullet(delta));
+                        }
+                    });
                 }
                 line_up_bullets.done = true;
                 continue;

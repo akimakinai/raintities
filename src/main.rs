@@ -1,5 +1,8 @@
+mod damage;
 mod enemy;
 mod health;
+mod item;
+mod level;
 mod player;
 
 use bevy::{
@@ -10,18 +13,23 @@ use bevy::{
 use bevy_debug_text_overlay::{screen_print, OverlayPlugin};
 use bevy_framepace::FramepacePlugin;
 use bevy_xpbd_2d::prelude::*;
-use enemy::{spawn_enemy, EnemyPlugin, ENEMY_SIZE};
+use damage::DamagePlugin;
+use enemy::EnemyPlugin;
 use health::HealthBarPlugin;
+use item::ItemPlugin;
+use level::LevelPlugin;
 use player::{Player, PlayerPlugin};
 
 pub const SCREEN_WIDTH: f32 = 800.0;
 pub const SCREEN_HEIGHT: f32 = 600.0;
 
 #[derive(PhysicsLayer)]
-pub enum Layer {
+pub enum MyLayer {
     Player,
-    Bullet,
+    PlayerBullet,
     Enemy,
+    EnemyBullet,
+    Item,
 }
 
 fn main() {
@@ -35,6 +43,11 @@ fn main() {
         }),
         ..default()
     }));
+    app.insert_resource(ClearColor(Color::rgb(
+        150. / 255. / 2.,
+        180. / 255. / 2.,
+        218. / 255. / 2.,
+    )));
 
     app.add_plugins(FrameTimeDiagnosticsPlugin::default())
         .add_systems(Update, |diagnostics: Res<DiagnosticsStore>| {
@@ -51,6 +64,9 @@ fn main() {
     app.add_plugins(PlayerPlugin)
         .add_plugins(EnemyPlugin)
         .add_plugins(HealthBarPlugin)
+        .add_plugins(DamagePlugin)
+        .add_plugins(ItemPlugin)
+        .add_plugins(LevelPlugin)
         .add_systems(Startup, setup)
         .add_systems(PreUpdate, update_mouse_pos)
         .add_systems(
@@ -75,22 +91,19 @@ struct MainCamera;
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     // Add camera
-    commands.spawn((Camera2dBundle::default(), MainCamera));
-
-    commands.spawn(SpriteBundle {
-        texture: asset_server.load("background/clouds.png"),
-        sprite: Sprite {
-            color: Color::rgb(0.5, 0.5, 0.5),
-            ..default()
-        },
-        transform: Transform::from_translation(Vec3::Z * -1.0),
-        ..default()
-    });
-
-    spawn_enemy(
-        &mut commands,
-        Vec2::new(-SCREEN_WIDTH / 2.0 - ENEMY_SIZE, 0.0),
-    );
+    commands
+        .spawn((Camera2dBundle::default(), MainCamera))
+        .with_children(|c| {
+            c.spawn(SpriteBundle {
+                texture: asset_server.load("background/clouds.png"),
+                sprite: Sprite {
+                    color: Color::rgb(0.5, 0.5, 0.5),
+                    ..default()
+                },
+                transform: Transform::from_translation(Vec3::Z * -1.0),
+                ..default()
+            });
+        });
 
     commands.spawn((Player::default(), Transform::from_translation(Vec3::Z)));
 }
