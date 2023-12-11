@@ -36,6 +36,18 @@ fn setup(mut commands: Commands) {
         ));
     }
 
+    for i in 0..3 {
+        let enemy_positions = [
+            Vec2::new(SCREEN_WIDTH / 2. + ENEMY_SIZE / 2., -i as f32 * 100. - 400.),
+            Vec2::new(2. * SCREEN_WIDTH / 3. - SCREEN_WIDTH / 2., -i as f32 * 100. - 400.),
+            Vec2::new(SCREEN_WIDTH / 3. - SCREEN_WIDTH / 2., -i as f32 * 100. - 400.),
+        ];
+        enemies.push((
+            Vec2::new(SCREEN_WIDTH / 2. + ENEMY_SIZE / 2., -i as f32 * 100. - 400.),
+            enemy_positions.into_iter().rev().collect::<Vec<_>>().into(),
+        ));
+    }
+
     let level = Level { enemies };
     commands.insert_resource(level);
 }
@@ -52,13 +64,14 @@ fn spawn_enemies(
 ) {
     let camera_y = camera.single().translation.y;
 
-    for (pos, enemy) in &level.enemies {
+    let mut rem_enemies = Vec::new();
+    for (pos, enemy) in level.enemies.drain(..) {
         if enemy.attack_pos.last().unwrap().y >= camera_y - SCREEN_WIDTH / 2. - ENEMY_SIZE / 2. {
-            spawn_enemy(&mut commands, *pos, enemy.clone());
+            debug!("spawning {:?}", enemy);
+            spawn_enemy(&mut commands, pos, enemy);
+        } else {
+            rem_enemies.push((pos, enemy));
         }
     }
-
-    level
-        .enemies
-        .retain(|enemy| enemy.1.attack_pos.last().unwrap().y < camera_y - SCREEN_WIDTH / 2.);
+    level.enemies = rem_enemies;
 }

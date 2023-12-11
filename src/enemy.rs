@@ -209,7 +209,7 @@ pub struct LineUpBullets {
 impl Default for LineUpBullets {
     fn default() -> Self {
         Self {
-            num: 16,
+            num: 8,
             bullets: Vec::new(),
             next_timer: Timer::from_seconds(0.05, TimerMode::Repeating),
             angle: 0.0,
