@@ -134,6 +134,10 @@ fn attack_system(
     res: Res<PlayerResource>,
 ) {
     for (id, state, transform, mut player) in &mut q {
+        if player.radius < 5. {
+            continue;
+        }
+
         if state.just_pressed(Action::Attack) {
             commands.entity(id).insert(AudioBundle {
                 source: res.attack_sound.clone(),
@@ -210,6 +214,19 @@ fn player_item_system(
     }
 }
 
+#[derive(Event)]
+pub struct PlayerDiedEvent;
+
+fn player_die_check(mut commands: Commands, player: Query<(Entity, &Player)>, mut player_died_event: EventWriter<PlayerDiedEvent>) {
+    let Ok((id, player)) = player.get_single() else {
+        return;
+    };
+    if player.radius < 5. {
+        player_died_event.send(PlayerDiedEvent);
+        commands.entity(id).despawn_recursive();
+    }
+}
+
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
@@ -221,6 +238,8 @@ impl Plugin for PlayerPlugin {
         app.add_systems(PostUpdate, (player_spawn, update_player_radius));
         app.add_systems(Update, (attack_system, remove_bullets));
         app.add_systems(Update, player_item_system);
+        app.add_event::<PlayerDiedEvent>()
+            .add_systems(Update, player_die_check);
         app.insert_resource(Gravity(Vec2::NEG_Y * 300.0));
     }
 }

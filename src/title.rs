@@ -1,4 +1,5 @@
 use bevy::{prelude::*, sprite::Mesh2dHandle};
+use bevy_debug_text_overlay::screen_print;
 
 use crate::GameState;
 
@@ -356,7 +357,7 @@ fn title_setup(
             .spawn(ColorMesh2dBundle {
                 mesh: mesh.clone(),
                 material: material.clone(),
-                transform: Transform::from_translation(Vec2::from(pos).extend(0.)),
+                transform: Transform::from_translation(Vec2::from(pos).extend(1.)),
                 ..default()
             })
             .insert(TitleDrop);
@@ -365,6 +366,7 @@ fn title_setup(
 
 fn title_system(mut state: ResMut<NextState<GameState>>, buttons: Res<Input<MouseButton>>) {
     if buttons.just_pressed(MouseButton::Left) {
+        screen_print!("Start game");
         state.set(GameState::Main);
     }
 }

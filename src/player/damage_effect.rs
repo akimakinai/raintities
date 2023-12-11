@@ -6,7 +6,7 @@ use bevy::{
 
 use crate::{MainCamera, SCREEN_HEIGHT, SCREEN_WIDTH};
 
-use super::Player;
+use super::{Player, PlayerDiedEvent};
 
 const INNER_SIZE: f32 = 100.0;
 
@@ -78,6 +78,14 @@ fn update_effect(
         Color::RED.with_a((0.8 - player.radius / 50.).clamp(0., 1.));
 }
 
+fn remove_effect(
+    mut damage_effect: Query<&mut Handle<ColorMaterial>, With<DamageEffect>>,
+    mut color_materials: ResMut<Assets<ColorMaterial>>,
+) {
+    let damage_effect = damage_effect.single_mut();
+    color_materials.get_mut(damage_effect.id()).unwrap().color = Color::RED.with_a(0.);
+}
+
 fn scroll_effect(
     mut transform: Query<&mut Transform, With<DamageEffect>>,
     camera: Query<&Transform, (With<MainCamera>, Without<DamageEffect>)>,
@@ -93,6 +101,7 @@ pub struct DamageEffectPlugin;
 impl Plugin for DamageEffectPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, startup)
-            .add_systems(PostUpdate, (update_effect, scroll_effect));
+            .add_systems(PostUpdate, (update_effect, scroll_effect))
+            .add_systems(Update, remove_effect.run_if(on_event::<PlayerDiedEvent>()));
     }
 }

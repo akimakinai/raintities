@@ -20,13 +20,13 @@ use bevy_framepace::FramepacePlugin;
 // use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_tweening::Animator;
 use bevy_xpbd_2d::prelude::*;
-use boss::BossPlugin;
+use boss::{Boss, BossPlugin};
 use damage::DamagePlugin;
-use enemy::{EnemyPlugin, ENEMY_SIZE};
+use enemy::{Enemy, EnemyBullet, EnemyPlugin, ENEMY_SIZE};
 use health::HealthBarPlugin;
 use item::ItemPlugin;
 use level::{Level, LevelPlugin};
-use player::{Player, PlayerPlugin};
+use player::{Player, PlayerBullet, PlayerDiedEvent, PlayerPlugin};
 use title::TitlePlugin;
 
 pub const SCREEN_WIDTH: f32 = 800.0;
@@ -102,7 +102,8 @@ fn main() {
         .add_systems(PreUpdate, update_mouse_pos)
         .add_systems(
             Update,
-            |mouse_pos: Option<Res<MouseWorldPos>>, mut q: Query<&mut Transform, With<Player>>| {
+            (|mouse_pos: Option<Res<MouseWorldPos>>,
+              mut q: Query<&mut Transform, With<Player>>| {
                 let Some(mouse_pos) = mouse_pos else { return };
                 if !mouse_pos.is_changed() {
                     return;
@@ -112,7 +113,8 @@ fn main() {
                     transform.translation = transform.translation
                         + (mouse_pos.0 - transform.translation.xy()).extend(0.0) * 0.3;
                 }
-            },
+            })
+            .run_if(in_state(GameState::Main)),
         )
         .add_systems(OnEnter(GameState::Main), |mut commands: Commands| {
             screen_print!("OnEnter(GameState::Main)");
@@ -128,6 +130,52 @@ fn main() {
             |mut commands: Commands, animators: Query<Entity, With<Animator<Transform>>>| {
                 for animator in animators.iter() {
                     commands.entity(animator).remove::<Animator<Transform>>();
+                }
+            },
+        )
+        .add_systems(
+            PostUpdate,
+            (|mut state: ResMut<NextState<GameState>>| {
+                screen_print!("Game over");
+                state.set(GameState::GameOver);
+            })
+            .run_if(on_event::<PlayerDiedEvent>()),
+        )
+        .add_systems(OnEnter(GameState::GameOver), |mut commands: Commands| {
+            commands.insert_resource(GameOverTimer(Timer::from_seconds(1.0, TimerMode::Once)));
+        })
+        .add_systems(
+            Update,
+            (|mut timer: ResMut<GameOverTimer>,
+              time: Res<Time>,
+              mut state: ResMut<NextState<GameState>>| {
+                if timer.0.tick(time.delta()).just_finished() {
+                    screen_print!("Go back to title");
+                    state.set(GameState::Title);
+                }
+            })
+            .run_if(in_state(GameState::GameOver)),
+        )
+        .add_systems(
+            OnExit(GameState::GameOver),
+            |mut commands: Commands,
+            mut camera: Query<&mut Transform, With<MainCamera>>,
+             main_entities: Query<
+                Entity,
+                Or<(
+                    With<Enemy>,
+                    With<Boss>,
+                    With<PlayerBullet>,
+                    With<EnemyBullet>,
+                )>,
+            >| {
+                commands.remove_resource::<GameOverTimer>();
+                commands.remove_resource::<Level>();
+
+                camera.single_mut().translation.y = 0.;
+
+                for e in &main_entities {
+                    commands.entity(e).despawn_recursive();
                 }
             },
         )
@@ -242,6 +290,9 @@ fn scroll_background(
         material.scroll = camera_y;
     }
 }
+
+#[derive(Resource)]
+struct GameOverTimer(Timer);
 
 #[derive(Resource, Default, PartialEq)]
 struct MouseWorldPos(Vec2);
