@@ -122,10 +122,12 @@ dependencies = [
  "bevy-debug-text-overlay",
  "bevy-inspector-egui",
  "bevy_framepace",
+ "bevy_tweening",
  "bevy_xpbd_2d",
  "blake3",
  "leafwing-input-manager",
  "rand",
+ "seldom_state",
 ]
 
 [[package]]
@@ -1076,6 +1078,16 @@ dependencies = [
  "bevy_reflect",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "bevy_tweening"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "216b3cb82fd0d149c5a9abfb5e382d8a671ff469f8759116e091c710bfa37139"
+dependencies = [
+ "bevy",
+ "interpolation",
 ]
 
 [[package]]
@@ -2313,6 +2325,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "interpolation"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3b7357d2bbc5ee92f8e899ab645233e43d21407573cceb37fed8bc3dede2c02"
+
+[[package]]
 name = "io-kit-sys"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3520,6 +3538,26 @@ name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
+
+[[package]]
+name = "seldom_fn_plugin"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9243595906f96e24fad2c31aea29a560aaf82e86c051836e5708bf9d300048e"
+dependencies = [
+ "bevy",
+]
+
+[[package]]
+name = "seldom_state"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de947c72cc9c3d7b0909c03d9265fc3c7df4fcd4853b38275ef0408edfa79fa5"
+dependencies = [
+ "bevy",
+ "either",
+ "seldom_fn_plugin",
+]
 
 [[package]]
 name = "semver"

@@ -1,60 +1,54 @@
 use bevy::prelude::*;
 
 use crate::{
+    boss::{Boss, BOSS_PADDING, BOSS_SIZE},
     enemy::{spawn_enemy, EnemyController, ENEMY_SIZE},
-    MainCamera, SCREEN_WIDTH,
+    MainCamera, SCREEN_HEIGHT,
 };
 
 pub struct LevelPlugin;
 
 impl Plugin for LevelPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup)
-            .add_systems(Update, (scroll_system, spawn_enemies).chain());
+        app.add_event::<ScrollDoneEvent>()
+            // .add_systems(Startup, setup)
+            .add_systems(Update, (scroll_system, spawn_enemies).chain().run_if(resource_exists::<Level>()));
     }
 }
 
 #[derive(Resource)]
-struct Level {
-    enemies: Vec<(Vec2, EnemyController)>,
+pub struct Level {
+    pub enemies: Vec<(Vec2, EnemyController)>,
+    pub boss_pos: Option<Vec2>,
 }
 
-fn setup(mut commands: Commands) {
-    let mut enemies = Vec::new();
-    for i in 0..3 {
-        let enemy_positions = [
-            Vec2::new(SCREEN_WIDTH / 3. - SCREEN_WIDTH / 2., -i as f32 * 100.),
-            Vec2::new(
-                2. * SCREEN_WIDTH / 3. - SCREEN_WIDTH / 2.,
-                -(i + 1) as f32 * 100.,
-            ),
-            Vec2::new(SCREEN_WIDTH / 2. + ENEMY_SIZE / 2., -i as f32 * 100.),
-        ];
-        enemies.push((
-            Vec2::new(-SCREEN_WIDTH / 2. - ENEMY_SIZE / 2., -i as f32 * 100.),
-            enemy_positions.into_iter().rev().collect::<Vec<_>>().into(),
-        ));
-    }
+#[derive(Event)]
+pub struct ScrollDoneEvent;
 
-    for i in 0..3 {
-        let enemy_positions = [
-            Vec2::new(SCREEN_WIDTH / 2. + ENEMY_SIZE / 2., -i as f32 * 100. - 400.),
-            Vec2::new(2. * SCREEN_WIDTH / 3. - SCREEN_WIDTH / 2., -i as f32 * 100. - 400.),
-            Vec2::new(SCREEN_WIDTH / 3. - SCREEN_WIDTH / 2., -i as f32 * 100. - 400.),
-        ];
-        enemies.push((
-            Vec2::new(SCREEN_WIDTH / 2. + ENEMY_SIZE / 2., -i as f32 * 100. - 400.),
-            enemy_positions.into_iter().rev().collect::<Vec<_>>().into(),
-        ));
-    }
+fn scroll_system(
+    mut camera: Query<&mut Transform, With<MainCamera>>,
+    boss: Query<&Transform, (With<Boss>, Without<MainCamera>)>,
+    time: Res<Time<Virtual>>,
+    mut scroll_done_event: EventWriter<ScrollDoneEvent>,
+    mut event_sent: Local<bool>,
+) {
+    if *event_sent { return; }
 
-    let level = Level { enemies };
-    commands.insert_resource(level);
-}
-
-fn scroll_system(mut camera: Query<&mut Transform, With<MainCamera>>, time: Res<Time>) {
     let mut camera = camera.single_mut();
-    camera.translation.y -= 15. * time.delta_seconds();
+
+    if let Ok(boss_transform) = boss.get_single() {
+        if boss_transform.translation.y
+            >= camera.translation.y - SCREEN_HEIGHT / 2. + BOSS_SIZE / 2. + BOSS_PADDING
+        {
+            if !*event_sent {
+                scroll_done_event.send(ScrollDoneEvent);
+            }
+            *event_sent = true;
+            return;
+        }
+    }
+
+    camera.translation.y -= 60. * time.delta_seconds();
 }
 
 fn spawn_enemies(
@@ -66,7 +60,7 @@ fn spawn_enemies(
 
     let mut rem_enemies = Vec::new();
     for (pos, enemy) in level.enemies.drain(..) {
-        if enemy.attack_pos.last().unwrap().y >= camera_y - SCREEN_WIDTH / 2. - ENEMY_SIZE / 2. {
+        if enemy.attack_pos.last().unwrap().y >= camera_y - SCREEN_HEIGHT / 2. - ENEMY_SIZE / 2. {
             debug!("spawning {:?}", enemy);
             spawn_enemy(&mut commands, pos, enemy);
         } else {
@@ -74,4 +68,15 @@ fn spawn_enemies(
         }
     }
     level.enemies = rem_enemies;
+
+    if let Some(boss_pos) = level.boss_pos {
+        if camera_y - SCREEN_HEIGHT / 2. - BOSS_SIZE / 2. <= boss_pos.y {
+            level.boss_pos = None;
+            commands.spawn((
+                Name::new("Boss"),
+                Boss,
+                SpatialBundle::from_transform(Transform::from_translation(boss_pos.extend(0.))),
+            ));
+        }
+    }
 }

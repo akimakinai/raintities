@@ -5,7 +5,7 @@ use bevy::{
 use bevy_debug_text_overlay::screen_print;
 use bevy_xpbd_2d::prelude::*;
 
-use crate::{health::Health, MyLayer, SCREEN_WIDTH};
+use crate::{health::Health, MainCamera, MyLayer, SCREEN_WIDTH};
 
 fn startup(mut commands: Commands) {
     commands.init_resource::<EnemyResource>();
@@ -77,6 +77,7 @@ pub fn spawn_enemy(commands: &mut Commands, pos: Vec2, controller: EnemyControll
                 max_health: 100.,
             },
         })
+        .insert(Name::new("Enemy"))
         .insert((
             Collider::ball(ENEMY_SIZE / 2.0),
             RigidBody::Kinematic,
@@ -141,7 +142,7 @@ fn enemy_state_behavior(
 fn enemy_movement(
     mut commands: Commands,
     mut enemies: Query<(Entity, &mut Transform, &mut EnemyController)>,
-    time: Res<Time>,
+    time: Res<Time<Virtual>>,
 ) {
     for (id, mut transform, mut ctrl) in &mut enemies {
         if ctrl.state != EnemyState::Moving {
@@ -191,9 +192,22 @@ fn enemy_attack_done(
 #[derive(Component)]
 pub struct EnemyBullet;
 
-fn rotate_bullets(time: Res<Time>, mut bullets: Query<&mut Transform, With<EnemyBullet>>) {
+fn rotate_bullets(time: Res<Time<Virtual>>, mut bullets: Query<&mut Transform, With<EnemyBullet>>) {
     for mut transform in &mut bullets {
         transform.rotate(Quat::from_rotation_z(time.delta_seconds() * 2.0));
+    }
+}
+
+fn despawn_enemy_bullet(
+    mut commands: Commands,
+    bullets: Query<(Entity, &Transform), With<EnemyBullet>>,
+    camera: Query<&Transform, With<MainCamera>>,
+) {
+    let camera_transform = camera.single();
+    for (id, transform) in &bullets {
+        if (transform.translation - camera_transform.translation).length() > 1000.0 {
+            commands.entity(id).despawn_recursive();
+        }
     }
 }
 
@@ -209,7 +223,7 @@ pub struct LineUpBullets {
 impl Default for LineUpBullets {
     fn default() -> Self {
         Self {
-            num: 8,
+            num: 16,
             bullets: Vec::new(),
             next_timer: Timer::from_seconds(0.05, TimerMode::Repeating),
             angle: 0.0,
@@ -218,7 +232,7 @@ impl Default for LineUpBullets {
     }
 }
 
-const BULLET_SIZE: f32 = 64.0;
+const BULLET_SIZE: f32 = 32.0;
 
 #[derive(Component)]
 struct StillBullet;
@@ -241,6 +255,7 @@ fn spawn_still_bullet(
                 ..default()
             })
             .insert(EnemyBullet)
+            .insert(Name::new("EnemyBullet"))
             .insert((
                 Collider::ball(BULLET_SIZE / 2. * 0.6),
                 RigidBody::Kinematic,
@@ -250,12 +265,12 @@ fn spawn_still_bullet(
 }
 
 #[derive(Component)]
-struct StraightBullet(Vec3);
+pub struct StraightBullet(pub Vec3);
 
 fn line_up_bullets_system(
     mut commands: Commands,
     mut q: Query<(&mut LineUpBullets, &Transform)>,
-    time: Res<Time>,
+    time: Res<Time<Virtual>>,
     enemy_res: Res<EnemyResource>,
 ) {
     for (mut line_up_bullets, transform) in &mut q {
@@ -292,7 +307,7 @@ fn line_up_bullets_system(
     }
 }
 
-fn move_straight_bullet(time: Res<Time>, mut bullets: Query<(&mut Transform, &StraightBullet)>) {
+fn move_straight_bullet(time: Res<Time<Virtual>>, mut bullets: Query<(&mut Transform, &StraightBullet)>) {
     for (mut transform, StraightBullet(delta)) in &mut bullets {
         transform.translation += *delta * time.delta_seconds();
     }
@@ -309,7 +324,8 @@ impl Plugin for EnemyPlugin {
 
         app.add_systems(Update, line_up_bullets_system)
             .add_systems(Update, spawn_still_bullet)
-            .add_systems(Update, move_straight_bullet);
+            .add_systems(Update, move_straight_bullet)
+            .add_systems(Update, despawn_enemy_bullet);
 
         app.add_systems(
             Update,

@@ -8,6 +8,8 @@ use rand::Rng;
 
 use crate::{item::Item, MainCamera, MyLayer};
 
+const PLAYER_BULLET_SIZE: f32 = 6.0;
+
 #[derive(Resource)]
 struct PlayerResource {
     bullet_mesh: Handle<Mesh>,
@@ -24,7 +26,7 @@ fn startup(
     commands.insert_resource(PlayerResource {
         bullet_mesh: meshes.add(
             shape::Circle {
-                radius: 8.0,
+                radius: PLAYER_BULLET_SIZE,
                 vertices: 6,
             }
             .into(),
@@ -147,7 +149,7 @@ fn attack_system(
                 ..default()
             };
 
-            let num = (player.radius / 50. * 32.) as usize;
+            let num = (player.radius / 50. * 64.) as usize;
 
             player.increase(-100.);
             screen_print!("Player radius: {}", player.radius);
@@ -167,8 +169,9 @@ fn attack_system(
                     })
                     .insert((
                         PlayerBullet,
+                        Name::new("PlayerBullet"),
                         RigidBody::Dynamic,
-                        Collider::ball(8.0),
+                        Collider::ball(PLAYER_BULLET_SIZE),
                         CollisionLayers::new([MyLayer::PlayerBullet], [MyLayer::Enemy]),
                         LinearVelocity(pos * 2.0),
                     ));

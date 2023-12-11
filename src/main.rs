@@ -1,9 +1,11 @@
+mod boss;
 mod damage;
 mod enemy;
 mod health;
 mod item;
 mod level;
 mod player;
+mod title;
 
 use bevy::{
     diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin},
@@ -12,13 +14,17 @@ use bevy::{
 };
 use bevy_debug_text_overlay::{screen_print, OverlayPlugin};
 use bevy_framepace::FramepacePlugin;
+// use bevy_inspector_egui::quick::WorldInspectorPlugin;
+use bevy_tweening::Animator;
 use bevy_xpbd_2d::prelude::*;
+use boss::BossPlugin;
 use damage::DamagePlugin;
-use enemy::EnemyPlugin;
+use enemy::{EnemyPlugin, ENEMY_SIZE};
 use health::HealthBarPlugin;
 use item::ItemPlugin;
-use level::LevelPlugin;
+use level::{Level, LevelPlugin};
 use player::{Player, PlayerPlugin};
+use title::TitlePlugin;
 
 pub const SCREEN_WIDTH: f32 = 800.0;
 pub const SCREEN_HEIGHT: f32 = 600.0;
@@ -30,6 +36,14 @@ pub enum MyLayer {
     Enemy,
     EnemyBullet,
     Item,
+}
+
+#[derive(Debug, States, Default, Hash, PartialEq, Eq, Clone, Copy)]
+enum GameState {
+    #[default]
+    Title,
+    Main,
+    GameOver,
 }
 
 fn main() {
@@ -59,7 +73,10 @@ fn main() {
     app.add_plugins(PhysicsPlugins::default())
         .add_plugins(PhysicsDebugPlugin::default())
         .add_plugins(OverlayPlugin::default())
+        // .add_plugins(WorldInspectorPlugin::new())
         .add_plugins(FramepacePlugin);
+
+    app.add_state::<GameState>();
 
     app.add_plugins(PlayerPlugin)
         .add_plugins(EnemyPlugin)
@@ -67,6 +84,8 @@ fn main() {
         .add_plugins(DamagePlugin)
         .add_plugins(ItemPlugin)
         .add_plugins(LevelPlugin)
+        .add_plugins(BossPlugin)
+        .add_plugins(TitlePlugin)
         .add_systems(Startup, setup)
         .add_systems(PreUpdate, update_mouse_pos)
         .add_systems(
@@ -83,7 +102,96 @@ fn main() {
                 }
             },
         )
+        .add_systems(OnEnter(GameState::Main), |mut commands: Commands| {
+            screen_print!("OnEnter(GameState::Main)");
+            commands.spawn((Player::default(), Transform::from_translation(Vec3::Z)));
+        })
+        .add_systems(OnEnter(GameState::Main), setup_level)
+        .add_systems(OnEnter(GameState::Title), |mut commands: Commands| {
+            screen_print!("OnEnter(GameState::Title)");
+            commands.remove_resource::<Level>();
+        })
+        .add_systems(
+            OnEnter(GameState::GameOver),
+            |mut commands: Commands, animators: Query<Entity, With<Animator<Transform>>>| {
+                for animator in animators.iter() {
+                    commands.entity(animator).remove::<Animator<Transform>>();
+                }
+            },
+        )
+        // .add_systems(
+        //     PostUpdate,
+        //     |parent: Query<&Parent>, vis: Query<(Entity, Option<&Name>), With<Visibility>>| {
+        //         for (id, name) in vis.iter().collect::<Vec<_>>() {
+        //             if let Ok(parent) = parent.get(id) {
+        //                 if !vis.contains(parent.get()) {
+        //                     error!(
+        //                         "Entity {:?} ({:?}) has parent without Visibility",
+        //                         id,
+        //                         name
+        //                     );
+        //                 }
+        //             }
+        //         }
+        //     },
+        // )
         .run();
+}
+
+fn setup_level(mut commands: Commands) {
+    let mut enemies = Vec::new();
+    for i in 0..3 {
+        let enemy_positions = [
+            Vec2::new(SCREEN_WIDTH / 3. - SCREEN_WIDTH / 2., -i as f32 * 100.),
+            Vec2::new(
+                2. * SCREEN_WIDTH / 3. - SCREEN_WIDTH / 2.,
+                -(i + 1) as f32 * 100.,
+            ),
+            Vec2::new(SCREEN_WIDTH / 2. + ENEMY_SIZE / 2., -i as f32 * 100.),
+        ];
+        enemies.push((
+            Vec2::new(-SCREEN_WIDTH / 2. - ENEMY_SIZE / 2., -i as f32 * 100.),
+            enemy_positions.into_iter().rev().collect::<Vec<_>>().into(),
+        ));
+    }
+
+    for i in 0..3 {
+        let enemy_positions = [
+            Vec2::new(
+                SCREEN_WIDTH / 3. + SCREEN_WIDTH / 2.,
+                -i as f32 * 100. - 400.,
+            ),
+            Vec2::new(
+                -SCREEN_WIDTH / 3. + SCREEN_WIDTH / 2.,
+                -i as f32 * 100. - 400.,
+            ),
+            Vec2::new(
+                -SCREEN_WIDTH / 2. - ENEMY_SIZE / 2.,
+                -i as f32 * 100. - 400.,
+            ),
+        ];
+        enemies.push((
+            Vec2::new(SCREEN_WIDTH / 2. + ENEMY_SIZE / 2., -i as f32 * 100. - 400.),
+            enemy_positions.into_iter().rev().collect::<Vec<_>>().into(),
+        ));
+    }
+
+    enemies.push((
+        Vec2::new(0., -900.),
+        vec![
+            Vec2::new(0., -800.),
+            Vec2::new(0., -750.),
+            Vec2::new(SCREEN_WIDTH / 3., -800.),
+            Vec2::new(SCREEN_WIDTH / 2. + ENEMY_SIZE / 2., -800.),
+        ]
+        .into(),
+    ));
+
+    let level = Level {
+        enemies,
+        boss_pos: Vec2::new(0., -1000.).into(),
+    };
+    commands.insert_resource(level);
 }
 
 #[derive(Component)]
@@ -103,9 +211,8 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                 transform: Transform::from_translation(Vec3::Z * -1.0),
                 ..default()
             });
-        });
-
-    commands.spawn((Player::default(), Transform::from_translation(Vec3::Z)));
+        })
+        .insert(Name::new("Background"));
 }
 
 #[derive(Resource, Default, PartialEq)]

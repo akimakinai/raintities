@@ -57,7 +57,7 @@ fn startup(
     commands
         .spawn(ColorMesh2dBundle {
             mesh: Mesh2dHandle(frame_mesh),
-            material: color_materials.add(Color::RED.with_a(0.2).into()),
+            material: color_materials.add(Color::RED.with_a(0.0).into()),
             ..default()
         })
         .insert(DamageEffect);

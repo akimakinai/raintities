@@ -40,6 +40,8 @@ rand = "0.8.5"
 
 # https://github.com/bevyengine/bevy/issues/10425
 blake3 = { version = "1.5", features = ["pure"] }
+seldom_state = "0.8.0"
+bevy_tweening = "0.9.0"
 
 [profile.dev]
 opt-level = 1
