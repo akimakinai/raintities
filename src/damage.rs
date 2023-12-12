@@ -14,6 +14,9 @@ use crate::{
     player::{Player, PlayerBullet},
 };
 
+#[derive(Event)]
+pub struct BossDiedEvent;
+
 #[derive(Resource)]
 struct DamageRes {
     hit_sound: Handle<AudioSource>,
@@ -39,6 +42,7 @@ fn enemy_damage(
     >,
     player_bullets: Query<(), With<PlayerBullet>>,
     res: Res<DamageRes>,
+    mut boss_died_event: EventWriter<BossDiedEvent>,
 ) {
     let mut hit_any = false;
 
@@ -46,10 +50,10 @@ fn enemy_damage(
         if is_boss {
             let angle = transform.rotation.to_axis_angle().1 / std::f32::consts::PI;
             if angle < 0.5 || angle > 1.5{
-                screen_print!("boss is not accepting damage: {}", angle);
+                // screen_print!("boss is not accepting damage: {}", angle);
                 continue;
             }
-            screen_print!("boss is accepting damage: {}", angle);
+            // screen_print!("boss is accepting damage: {}", angle);
         }
         let mut hit = false;
         for &entity in colliding_entities.iter() {
@@ -60,7 +64,11 @@ fn enemy_damage(
                 if health.health <= 0. {
                     health.health = 0.;
                     commands.entity(enemy_id).despawn_recursive();
-                    screen_print!(push, "Enemy is dead!");
+                    // screen_print!(push, "Enemy died!");
+
+                    if is_boss {
+                        boss_died_event.send(BossDiedEvent);
+                    }
 
                     let mut rng = rand::thread_rng();
                     for _ in 0..32 {
@@ -80,7 +88,7 @@ fn enemy_damage(
         if hit && !hit_any {
             commands.spawn(AudioBundle {
                 source: res.hit_sound.clone(),
-                settings: PlaybackSettings::REMOVE
+                settings: PlaybackSettings::DESPAWN
                     .with_volume(Volume::Relative(VolumeLevel::new(0.5))),
             });
         }
@@ -106,11 +114,11 @@ fn player_damage(
         }
     }
     if colliding_bullets > 0 {
-        player.increase(-colliding_bullets as f32 * 40.);
+        player.increase(-colliding_bullets as f32 * 80.);
 
         commands.spawn(AudioBundle {
             source: res.hit_sound.clone(),
-            settings: PlaybackSettings::REMOVE.with_volume(Volume::Relative(VolumeLevel::new(0.5))),
+            settings: PlaybackSettings::DESPAWN.with_volume(Volume::Relative(VolumeLevel::new(0.5))),
         });
     }
 }
@@ -119,6 +127,7 @@ pub struct DamagePlugin;
 
 impl Plugin for DamagePlugin {
     fn build(&self, app: &mut App) {
+        app.add_event::<BossDiedEvent>();
         app.add_systems(Startup, startup);
         app.add_systems(Update, (enemy_damage, player_damage));
     }

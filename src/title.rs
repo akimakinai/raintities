@@ -70,6 +70,9 @@ struct TitleDrop;
 //     }
 // }
 
+#[derive(Component)]
+pub struct TitleRoot;
+
 fn title_setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -352,6 +355,12 @@ fn title_setup(
     );
     let material = color_materials.add(ColorMaterial::from(Color::CYAN));
 
+    let root = commands.spawn((
+        Name::new("Title root"),
+        TitleRoot,
+        SpatialBundle::default(),
+    )).id();
+
     for pos in drop_pos {
         commands
             .spawn(ColorMesh2dBundle {
@@ -360,13 +369,14 @@ fn title_setup(
                 transform: Transform::from_translation(Vec2::from(pos).extend(1.)),
                 ..default()
             })
-            .insert(TitleDrop);
+            .insert(TitleDrop)
+            .set_parent(root);
     }
 }
 
 fn title_system(mut state: ResMut<NextState<GameState>>, buttons: Res<Input<MouseButton>>) {
     if buttons.just_pressed(MouseButton::Left) {
-        screen_print!("Start game");
+        // screen_print!("Start game");
         state.set(GameState::Main);
     }
 }

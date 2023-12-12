@@ -3,8 +3,9 @@ use bevy::{
     render::{mesh::Indices, render_resource::PrimitiveTopology},
     sprite::Mesh2dHandle,
 };
+use bevy_debug_text_overlay::screen_print;
 
-use crate::{MainCamera, SCREEN_HEIGHT, SCREEN_WIDTH};
+use crate::{damage::BossDiedEvent, MainCamera, SCREEN_HEIGHT, SCREEN_WIDTH};
 
 use super::{Player, PlayerDiedEvent};
 
@@ -82,6 +83,7 @@ fn remove_effect(
     mut damage_effect: Query<&mut Handle<ColorMaterial>, With<DamageEffect>>,
     mut color_materials: ResMut<Assets<ColorMaterial>>,
 ) {
+    // screen_print!("Removing damage effect");
     let damage_effect = damage_effect.single_mut();
     color_materials.get_mut(damage_effect.id()).unwrap().color = Color::RED.with_a(0.);
 }
@@ -102,6 +104,10 @@ impl Plugin for DamageEffectPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, startup)
             .add_systems(PostUpdate, (update_effect, scroll_effect))
-            .add_systems(Update, remove_effect.run_if(on_event::<PlayerDiedEvent>()));
+            .add_systems(
+                Update,
+                remove_effect
+                    .run_if(on_event::<PlayerDiedEvent>().or_else(on_event::<BossDiedEvent>())),
+            );
     }
 }

@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::{
     boss::{Boss, BOSS_PADDING, BOSS_SIZE},
     enemy::{spawn_enemy, EnemyController, ENEMY_SIZE},
-    MainCamera, SCREEN_HEIGHT,
+    MainCamera, ScrollSpeed, SCREEN_HEIGHT,
 };
 
 pub struct LevelPlugin;
@@ -12,7 +12,12 @@ impl Plugin for LevelPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<ScrollDoneEvent>()
             // .add_systems(Startup, setup)
-            .add_systems(Update, (scroll_system, spawn_enemies).chain().run_if(resource_exists::<Level>()));
+            .add_systems(
+                Update,
+                (scroll_system, spawn_enemies)
+                    .chain()
+                    .run_if(resource_exists::<Level>()),
+            );
     }
 }
 
@@ -31,9 +36,8 @@ fn scroll_system(
     time: Res<Time<Virtual>>,
     mut scroll_done_event: EventWriter<ScrollDoneEvent>,
     mut event_sent: Local<bool>,
+    scroll_speed: Res<ScrollSpeed>,
 ) {
-    if *event_sent { return; }
-
     let mut camera = camera.single_mut();
 
     if let Ok(boss_transform) = boss.get_single() {
@@ -46,9 +50,15 @@ fn scroll_system(
             *event_sent = true;
             return;
         }
+
+        if *event_sent {
+            return;
+        }
+    } else {
+        *event_sent = false;
     }
 
-    camera.translation.y -= 60. * time.delta_seconds();
+    camera.translation.y -= 60. * time.delta_seconds() * scroll_speed.0;
 }
 
 fn spawn_enemies(

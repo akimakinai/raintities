@@ -5,6 +5,8 @@
 
 struct BackgroundMaterial {
     scroll: f32,
+    alpha: f32,
+    padding: vec2<f32>, // Add padding to make the struct size a multiple of 16 bytes
 };
 
 @group(1) @binding(0) var<uniform> material: BackgroundMaterial;
@@ -19,9 +21,9 @@ fn fragment(
 
     var noise = simplexNoise2(vec2f(mesh.position.x / 100., (mesh.position.y - scroll) / 100.));
     if noise > 0.3 {
-        output_color = vec4<f32>(0.6, 0.6, 0.6, 1.0);
+        output_color = vec4<f32>(0.6, 0.6, 0.6, material.alpha);
     } else {
-        output_color = vec4<f32>(0.29, 0.353, 0.427, 1.0);
+        output_color = vec4<f32>(0.29, 0.353, 0.427, material.alpha);
     }
     // var output_color: vec4<f32> = vec4<f32>(1.0, 1.0, 1.0, 1.0);
 

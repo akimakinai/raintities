@@ -86,9 +86,9 @@ pub fn spawn_enemy(commands: &mut Commands, pos: Vec2, controller: EnemyControll
 }
 
 #[derive(Resource)]
-struct EnemyResource {
+pub struct EnemyResource {
     image: Handle<Image>,
-    bullet_sound: Handle<AudioSource>,
+    pub bullet_sound: Handle<AudioSource>,
 }
 
 impl FromWorld for EnemyResource {
@@ -126,11 +126,11 @@ fn enemy_state_behavior(
     mut enemies: Query<(Entity, &EnemyController), Changed<EnemyController>>,
 ) {
     for (entity, ctrl) in &mut enemies {
-        screen_print!("Enemy({:?}) ctrl: {:?}", entity, ctrl);
+        // screen_print!("Enemy({:?}) ctrl: {:?}", entity, ctrl);
 
         match ctrl.state {
             EnemyState::Attacking => {
-                commands.entity(entity).insert(LineUpBullets::default());
+                commands.entity(entity).try_insert(LineUpBullets::default());
             }
             EnemyState::Moving => {
                 commands.entity(entity).remove::<LineUpBullets>();
@@ -154,11 +154,11 @@ fn enemy_movement(
             continue;
         };
 
-        // screen_print!("movement_target: {}", move_target);
+        // // screen_print!("movement_target: {}", move_target);
 
         let diff = *move_target - transform.translation.xy();
         let movement = diff.normalize() * 100.0 * time.delta_seconds();
-        // screen_print!("diff = {}, movement = {}", diff, movement);
+        // // screen_print!("diff = {}, movement = {}", diff, movement);
 
         // If the enemy is close to the target, just move it to the target.
         if diff.length() < 0.1
@@ -307,7 +307,10 @@ fn line_up_bullets_system(
     }
 }
 
-fn move_straight_bullet(time: Res<Time<Virtual>>, mut bullets: Query<(&mut Transform, &StraightBullet)>) {
+fn move_straight_bullet(
+    time: Res<Time<Virtual>>,
+    mut bullets: Query<(&mut Transform, &StraightBullet)>,
+) {
     for (mut transform, StraightBullet(delta)) in &mut bullets {
         transform.translation += *delta * time.delta_seconds();
     }

@@ -1,23 +1,12 @@
 use bevy::{
-    asset::load_internal_asset,
     prelude::*,
     render::render_resource::{AsBindGroup, ShaderRef, ShaderType},
     sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle},
 };
-
-pub const BACKGROUND_MATERIAL_SHADER_HANDLE: Handle<Shader> =
-    Handle::weak_from_u128(0x0039459badf94126ac7c936336ebb5c0);
-
 pub struct BackgroundPlugin;
 
 impl Plugin for BackgroundPlugin {
     fn build(&self, app: &mut App) {
-        load_internal_asset!(
-            app,
-            BACKGROUND_MATERIAL_SHADER_HANDLE,
-            "background_material.wgsl",
-            Shader::from_wgsl
-        );
         app.add_plugins(Material2dPlugin::<BackgroundMaterial>::default())
             .register_asset_reflect::<BackgroundMaterial>();
     }
@@ -28,24 +17,31 @@ impl Plugin for BackgroundPlugin {
 #[uniform(0, BackgroundMaterialUniform)]
 pub struct BackgroundMaterial {
     pub scroll: f32,
+    pub alpha: f32,
 }
 
 #[derive(Clone, Default, ShaderType)]
 pub struct BackgroundMaterialUniform {
     pub scroll: f32,
+    pub alpha: f32,
+    padding_1: u32,
+    padding_2: u32,
 }
 
 impl From<&BackgroundMaterial> for BackgroundMaterialUniform {
     fn from(material: &BackgroundMaterial) -> Self {
         BackgroundMaterialUniform {
             scroll: material.scroll,
+            alpha: material.alpha,
+            padding_1: 0,
+            padding_2: 0,
         }
     }
 }
 
 impl Material2d for BackgroundMaterial {
     fn fragment_shader() -> ShaderRef {
-        BACKGROUND_MATERIAL_SHADER_HANDLE.into()
+        "shaders/background_material.wgsl".into()
     }
 }
 

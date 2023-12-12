@@ -68,7 +68,7 @@ fn update_healthbar(
     mut transforms: Query<&mut Transform>,
 ) {
     for (health, children) in &healths {
-        screen_print!("Health: {:?} (children = {})", health, children.len());
+        // screen_print!("Health: {:?} (children = {})", health, children.len());
 
         for child in children {
             if let Ok((bar_children, mut vis)) = health_bars.get_mut(*child) {
@@ -78,7 +78,7 @@ fn update_healthbar(
                     vis.set_if_neq(Visibility::Inherited);
                 }
 
-                screen_print!("bar_children = {:?}", bar_children);
+                // screen_print!("bar_children = {:?}", bar_children);
                 let foreground = bar_children[0];
                 let mut tf = transforms.get_mut(foreground).unwrap();
                 tf.scale.x = health.percent() / 100.0;

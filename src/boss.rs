@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bevy::{prelude::*, sprite::Mesh2dHandle};
+use bevy::{prelude::*, sprite::Mesh2dHandle, audio::{Volume, VolumeLevel}};
 use bevy_debug_text_overlay::screen_print;
 use bevy_tweening::{
     lens::{TransformPositionLens, TransformRotationLens},
@@ -16,7 +16,7 @@ use seldom_state::{
 };
 
 use crate::{
-    enemy::{EnemyBullet, StraightBullet},
+    enemy::{EnemyBullet, EnemyResource, StraightBullet},
     health::Health,
     item::Item,
     level::ScrollDoneEvent,
@@ -75,7 +75,7 @@ fn spawn_boss(
     asset_server: Res<AssetServer>,
 ) {
     for id in &query {
-        screen_print!("Boss Spawned as {:?}", id);
+        // screen_print!("Boss Spawned as {:?}", id);
 
         commands
             .entity(id)
@@ -134,7 +134,7 @@ fn startup(
             }
             .into(),
         ),
-        bullet_material: color_materials.add(ColorMaterial::from(Color::CYAN)),
+        bullet_material: color_materials.add(ColorMaterial::from(Color::BLUE)),
     })
 }
 
@@ -175,7 +175,7 @@ fn idle_system(
 #[derive(Component)]
 struct BossBullet;
 
-const ATTACK_NUM: u32 = 64;
+const ATTACK_NUM: u32 = 16;
 
 #[derive(Component)]
 struct AttackState {
@@ -217,6 +217,7 @@ fn attack_system(
     mut boss: Query<(&Transform, &mut AttackState)>,
     time: Res<Time<Virtual>>,
     res: Res<BossResource>,
+    enemy_res: Res<EnemyResource>,
 ) {
     for (transform, mut state) in &mut boss {
         if state.num < ATTACK_NUM && state.timer.tick(time.elapsed()).just_finished() {
@@ -252,6 +253,15 @@ fn attack_system(
             debug!("Spawned BossBullet({id:?}) at {bullet_pos:?}, direction = {direction:?}");
 
             state.num += 1;
+
+            commands.spawn(AudioBundle {
+                source: enemy_res.bullet_sound.clone(),
+                settings: PlaybackSettings {
+                    mode: bevy::audio::PlaybackMode::Despawn,
+                    volume: Volume::Relative(VolumeLevel::new(0.2)),
+                    ..default()
+                },
+            });
         }
     }
 }

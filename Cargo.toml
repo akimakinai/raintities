@@ -28,7 +28,7 @@ bevy = { version = "0.12.1", features = [
   "bevy_gizmos",
 #   "android_shared_stdcxx",
   "tonemapping_luts",
-  "default_font",
+#   "default_font",
   "webgl2",
 ] }
 bevy-debug-text-overlay = "7.0.0"

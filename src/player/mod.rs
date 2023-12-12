@@ -6,7 +6,7 @@ use bevy_xpbd_2d::prelude::*;
 use leafwing_input_manager::prelude::*;
 use rand::Rng;
 
-use crate::{item::Item, MainCamera, MyLayer};
+use crate::{damage::BossDiedEvent, item::Item, MainCamera, MyLayer};
 
 const PLAYER_BULLET_SIZE: f32 = 6.0;
 
@@ -15,6 +15,7 @@ struct PlayerResource {
     bullet_mesh: Handle<Mesh>,
     bullet_material: Handle<ColorMaterial>,
     attack_sound: Handle<AudioSource>,
+    die_sound: Handle<AudioSource>,
 }
 
 fn startup(
@@ -33,6 +34,7 @@ fn startup(
         ),
         bullet_material: color_materials.add(ColorMaterial::from(Color::CYAN)),
         attack_sound: asset_server.load("sounds/splash_03.ogg"),
+        die_sound: asset_server.load("sounds/hit_01.ogg"),
     });
 }
 
@@ -139,7 +141,7 @@ fn attack_system(
         }
 
         if state.just_pressed(Action::Attack) {
-            commands.entity(id).insert(AudioBundle {
+            commands.entity(id).try_insert(AudioBundle {
                 source: res.attack_sound.clone(),
                 settings: PlaybackSettings {
                     mode: bevy::audio::PlaybackMode::Remove,
@@ -156,7 +158,7 @@ fn attack_system(
             let num = (player.radius / 50. * 64.) as usize;
 
             player.increase(-100.);
-            screen_print!("Player radius: {}", player.radius);
+            // screen_print!("Player radius: {}", player.radius);
 
             let mut rng = rand::thread_rng();
             for _ in 0..num {
@@ -217,12 +219,21 @@ fn player_item_system(
 #[derive(Event)]
 pub struct PlayerDiedEvent;
 
-fn player_die_check(mut commands: Commands, player: Query<(Entity, &Player)>, mut player_died_event: EventWriter<PlayerDiedEvent>) {
+fn player_die_check(
+    mut commands: Commands,
+    player: Query<(Entity, &Player)>,
+    mut player_died_event: EventWriter<PlayerDiedEvent>,
+    player_res: Res<PlayerResource>,
+) {
     let Ok((id, player)) = player.get_single() else {
         return;
     };
     if player.radius < 5. {
         player_died_event.send(PlayerDiedEvent);
+        commands.spawn(AudioBundle {
+            source: player_res.die_sound.clone(),
+            settings: PlaybackSettings::DESPAWN,
+        });
         commands.entity(id).despawn_recursive();
     }
 }
@@ -240,6 +251,16 @@ impl Plugin for PlayerPlugin {
         app.add_systems(Update, player_item_system);
         app.add_event::<PlayerDiedEvent>()
             .add_systems(Update, player_die_check);
+        app.add_systems(
+            PostUpdate,
+            (|mut player: Query<&mut Player>| {
+                let Ok(mut player) = player.get_single_mut() else {
+                    return;
+                };
+                player.radius = 50.;
+            })
+            .run_if(on_event::<BossDiedEvent>()),
+        );
         app.insert_resource(Gravity(Vec2::NEG_Y * 300.0));
     }
 }

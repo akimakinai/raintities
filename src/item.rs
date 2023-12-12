@@ -10,7 +10,7 @@ struct ItemResource {
 
 fn startup(mut commands: Commands, mut color_materials: ResMut<Assets<ColorMaterial>>) {
     commands.insert_resource(ItemResource {
-        material: color_materials.add(Color::BLUE.into()),
+        material: color_materials.add(Color::CYAN.into()),
     });
 }
 
