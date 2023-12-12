@@ -115,22 +115,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0942ffc6dcaadf03badf6e6a2d0228460359d5e34b57ccdc720b7382dfbd5ec5"
 
 [[package]]
-name = "alot"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy-debug-text-overlay",
- "bevy-inspector-egui",
- "bevy_framepace",
- "bevy_tweening",
- "bevy_xpbd_2d",
- "blake3",
- "leafwing-input-manager",
- "rand",
- "seldom_state",
-]
-
-[[package]]
 name = "alsa"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3300,6 +3284,22 @@ name = "radsort"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "17fd96390ed3feda12e1dfe2645ed587e0bea749e319333f104a33ff62f77a0b"
+
+[[package]]
+name = "raintities"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy-debug-text-overlay",
+ "bevy-inspector-egui",
+ "bevy_framepace",
+ "bevy_tweening",
+ "bevy_xpbd_2d",
+ "blake3",
+ "leafwing-input-manager",
+ "rand",
+ "seldom_state",
+]
 
 [[package]]
 name = "rand"
